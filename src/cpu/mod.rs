@@ -1,6 +1,6 @@
 use self::{
     instructions::{ArithmeticTarget, Instruction},
-    registers::{Flags, Registers},
+    registers::Registers,
 };
 
 mod instructions;
@@ -14,20 +14,16 @@ pub struct Cpu {
 
 impl Cpu {
     fn execute(&mut self, instruction: Instruction) {
-        if let Some(flags) = match instruction {
+        match instruction {
             Instruction::Nop => self.nop(),
             Instruction::Add(target) => self.add(target),
-        } {
-            self.registers.set_flags(flags);
         }
     }
 
-    fn nop(&self) -> Option<Flags> {
-        None
-    }
+    fn nop(&self) {}
 
     /// Take the value from `target` register and add it to A
-    fn add(&mut self, target: ArithmeticTarget) -> Option<Flags> {
+    fn add(&mut self, target: ArithmeticTarget) {
         let value = match target {
             ArithmeticTarget::A => self.registers.a,
             ArithmeticTarget::B => self.registers.b,
@@ -40,18 +36,18 @@ impl Cpu {
 
         let (result, carry) = self.registers.a.overflowing_add(value);
         self.registers.a = result;
+        self.registers.f.set_zero(result == 0);
+        self.registers.f.set_subtract(false);
         // check to see if we carried at the nibble
-        Some(Flags {
-            zero: result == 0,
-            subtract: false,
-            half_carry: (result & 0x10) == 0x10,
-            carry,
-        })
+        self.registers.f.set_half_carry((result & 0x10) == 0x10);
+        self.registers.f.set_carry(carry);
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use self::registers::Flags;
+
     use super::*;
 
     #[test]
@@ -72,14 +68,7 @@ mod tests {
         let expected_states = [
             Cpu {
                 registers: Registers {
-                    a: 0,
-                    f: Flags {
-                        zero: true,
-                        subtract: false,
-                        half_carry: false,
-                        carry: false,
-                    }
-                    .into(),
+                    f: Flags(0b1000_0000),
                     ..cpu.registers
                 },
                 ..cpu
@@ -122,13 +111,7 @@ mod tests {
             Cpu {
                 registers: Registers {
                     a: 21,
-                    f: Flags {
-                        zero: false,
-                        subtract: false,
-                        half_carry: true,
-                        carry: false,
-                    }
-                    .into(),
+                    f: Flags(0b0010_0000),
                     ..cpu.registers
                 },
                 ..cpu
@@ -166,13 +149,7 @@ mod tests {
         let expected = Cpu {
             registers: Registers {
                 a: 0,
-                f: Flags {
-                    zero: true,
-                    subtract: false,
-                    half_carry: false,
-                    carry: true,
-                }
-                .into(),
+                f: Flags(0b1001_0000),
                 ..cpu.registers
             },
             ..cpu
