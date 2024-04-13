@@ -16,14 +16,23 @@ impl Cpu {
     fn execute(&mut self, instruction: Instruction) {
         match instruction {
             Instruction::Nop => self.nop(),
-            Instruction::Add(target) => self.add(target),
+            Instruction::Add(target) => self.add(target, false),
+            Instruction::AddCarry(target) => self.add(target, true),
+            Instruction::Sub(target) => self.sub(target, false),
+            Instruction::SubCarry(target) => self.sub(target, true),
+            Instruction::And(target) => self.and(target),
+            Instruction::Xor(target) => self.xor(target),
+            Instruction::Or(target) => self.or(target),
+            Instruction::Cp(target) => self.cp(target),
         }
     }
 
     fn nop(&self) {}
 
-    /// Take the value from `target` register and add it to A
-    fn add(&mut self, target: ArithmeticTarget) {
+    /// Take the value from `target` register and add it to A.
+    ///
+    /// - `carry` will use the carrybit in the addition.
+    fn add(&mut self, target: ArithmeticTarget, carry: bool) {
         let value = match target {
             ArithmeticTarget::A => self.registers.a,
             ArithmeticTarget::B => self.registers.b,
@@ -32,10 +41,140 @@ impl Cpu {
             ArithmeticTarget::E => self.registers.e,
             ArithmeticTarget::H => self.registers.h,
             ArithmeticTarget::L => self.registers.l,
+            ArithmeticTarget::IndirectHL => {
+                todo!("Need to figured out how I want to structure rom")
+            }
         };
 
-        let (result, carry) = self.registers.a.overflowing_add(value);
+        let carry = if carry {
+            self.registers.f.carry().into()
+        } else {
+            0
+        };
+
+        let (result, carry) = self.registers.a.overflowing_add(value + carry);
         self.registers.a = result;
+        self.registers.f.set_zero(result == 0);
+        self.registers.f.set_subtract(false);
+        // check to see if we carried at the nibble
+        self.registers.f.set_half_carry((result & 0x10) == 0x10);
+        self.registers.f.set_carry(carry);
+    }
+
+    /// Take the value from `target` register and sub it to from A.
+    ///
+    /// - `carry` will use the carrybit in the subtraction.
+    fn sub(&mut self, target: ArithmeticTarget, carry: bool) {
+        let value = match target {
+            ArithmeticTarget::A => self.registers.a,
+            ArithmeticTarget::B => self.registers.b,
+            ArithmeticTarget::C => self.registers.c,
+            ArithmeticTarget::D => self.registers.d,
+            ArithmeticTarget::E => self.registers.e,
+            ArithmeticTarget::H => self.registers.h,
+            ArithmeticTarget::L => self.registers.l,
+            ArithmeticTarget::IndirectHL => {
+                todo!("Need to figured out how I want to structure rom")
+            }
+        };
+
+        let carry = if carry {
+            self.registers.f.carry().into()
+        } else {
+            0
+        };
+
+        let (result, carry) = self.registers.a.overflowing_sub(value + carry);
+        self.registers.a = result;
+        self.registers.f.set_zero(result == 0);
+        self.registers.f.set_subtract(false);
+        // check to see if we carried at the nibble
+        self.registers.f.set_half_carry((result & 0x10) == 0x10);
+        self.registers.f.set_carry(carry);
+    }
+
+    fn and(&mut self, target: ArithmeticTarget) {
+        let value = match target {
+            ArithmeticTarget::A => self.registers.a,
+            ArithmeticTarget::B => self.registers.b,
+            ArithmeticTarget::C => self.registers.c,
+            ArithmeticTarget::D => self.registers.d,
+            ArithmeticTarget::E => self.registers.e,
+            ArithmeticTarget::H => self.registers.h,
+            ArithmeticTarget::L => self.registers.l,
+            ArithmeticTarget::IndirectHL => {
+                todo!("Need to figured out how I want to structure rom")
+            }
+        };
+
+        self.registers.a &= value;
+
+        self.registers.f.set_zero(self.registers.a == 0);
+        self.registers.f.set_subtract(false);
+        self.registers.f.set_half_carry(true);
+        self.registers.f.set_carry(false);
+    }
+
+    fn xor(&mut self, target: ArithmeticTarget) {
+        let value = match target {
+            ArithmeticTarget::A => self.registers.a,
+            ArithmeticTarget::B => self.registers.b,
+            ArithmeticTarget::C => self.registers.c,
+            ArithmeticTarget::D => self.registers.d,
+            ArithmeticTarget::E => self.registers.e,
+            ArithmeticTarget::H => self.registers.h,
+            ArithmeticTarget::L => self.registers.l,
+            ArithmeticTarget::IndirectHL => {
+                todo!("Need to figured out how I want to structure rom")
+            }
+        };
+
+        self.registers.a ^= value;
+
+        self.registers.f.set_zero(self.registers.a == 0);
+        self.registers.f.set_subtract(false);
+        self.registers.f.set_half_carry(false);
+        self.registers.f.set_carry(false);
+    }
+
+    fn or(&mut self, target: ArithmeticTarget) {
+        let value = match target {
+            ArithmeticTarget::A => self.registers.a,
+            ArithmeticTarget::B => self.registers.b,
+            ArithmeticTarget::C => self.registers.c,
+            ArithmeticTarget::D => self.registers.d,
+            ArithmeticTarget::E => self.registers.e,
+            ArithmeticTarget::H => self.registers.h,
+            ArithmeticTarget::L => self.registers.l,
+            ArithmeticTarget::IndirectHL => {
+                todo!("Need to figured out how I want to structure rom")
+            }
+        };
+
+        self.registers.a |= value;
+
+        self.registers.f.set_zero(self.registers.a == 0);
+        self.registers.f.set_subtract(false);
+        self.registers.f.set_half_carry(false);
+        self.registers.f.set_carry(false);
+    }
+
+    fn cp(&mut self, target: ArithmeticTarget) {
+        let value = match target {
+            ArithmeticTarget::A => self.registers.a,
+            ArithmeticTarget::B => self.registers.b,
+            ArithmeticTarget::C => self.registers.c,
+            ArithmeticTarget::D => self.registers.d,
+            ArithmeticTarget::E => self.registers.e,
+            ArithmeticTarget::H => self.registers.h,
+            ArithmeticTarget::L => self.registers.l,
+            ArithmeticTarget::IndirectHL => {
+                todo!("Need to figured out how I want to structure rom")
+            }
+        };
+
+        let (result, carry) = self.registers.a.overflowing_sub(value);
+
         self.registers.f.set_zero(result == 0);
         self.registers.f.set_subtract(false);
         // check to see if we carried at the nibble
