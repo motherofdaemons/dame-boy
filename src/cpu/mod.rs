@@ -1,9 +1,11 @@
+use instructions::{LoadTarget, Register};
+
 use self::{
     instructions::{ArithmeticTarget, Instruction},
     registers::Registers,
 };
 
-mod instructions;
+pub mod instructions;
 mod registers;
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -13,7 +15,11 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    fn execute(&mut self, instruction: Instruction) {
+    pub fn sp(&self) -> u16 {
+        self.sp
+    }
+
+    pub fn execute(&mut self, instruction: Instruction) {
         match instruction {
             Instruction::Nop => self.nop(),
             Instruction::Add(target) => self.add(target, false),
@@ -23,7 +29,8 @@ impl Cpu {
             Instruction::And(target) => self.and(target),
             Instruction::Xor(target) => self.xor(target),
             Instruction::Or(target) => self.or(target),
-            Instruction::Cp(target) => self.cp(target),
+            Instruction::Compare(target) => self.compare(target),
+            Instruction::Load { dst, src } => self.load(dst, src),
         }
     }
 
@@ -34,14 +41,14 @@ impl Cpu {
     /// - `carry` will use the carrybit in the addition.
     fn add(&mut self, target: ArithmeticTarget, carry: bool) {
         let value = match target {
-            ArithmeticTarget::A => self.registers.a,
-            ArithmeticTarget::B => self.registers.b,
-            ArithmeticTarget::C => self.registers.c,
-            ArithmeticTarget::D => self.registers.d,
-            ArithmeticTarget::E => self.registers.e,
-            ArithmeticTarget::H => self.registers.h,
-            ArithmeticTarget::L => self.registers.l,
-            ArithmeticTarget::IndirectHL => {
+            ArithmeticTarget::Register(Register::A) => self.registers.a,
+            ArithmeticTarget::Register(Register::B) => self.registers.b,
+            ArithmeticTarget::Register(Register::C) => self.registers.c,
+            ArithmeticTarget::Register(Register::D) => self.registers.d,
+            ArithmeticTarget::Register(Register::E) => self.registers.e,
+            ArithmeticTarget::Register(Register::H) => self.registers.h,
+            ArithmeticTarget::Register(Register::L) => self.registers.l,
+            ArithmeticTarget::IndirectHl => {
                 todo!("Need to figured out how I want to structure rom")
             }
         };
@@ -66,14 +73,14 @@ impl Cpu {
     /// - `carry` will use the carrybit in the subtraction.
     fn sub(&mut self, target: ArithmeticTarget, carry: bool) {
         let value = match target {
-            ArithmeticTarget::A => self.registers.a,
-            ArithmeticTarget::B => self.registers.b,
-            ArithmeticTarget::C => self.registers.c,
-            ArithmeticTarget::D => self.registers.d,
-            ArithmeticTarget::E => self.registers.e,
-            ArithmeticTarget::H => self.registers.h,
-            ArithmeticTarget::L => self.registers.l,
-            ArithmeticTarget::IndirectHL => {
+            ArithmeticTarget::Register(Register::A) => self.registers.a,
+            ArithmeticTarget::Register(Register::B) => self.registers.b,
+            ArithmeticTarget::Register(Register::C) => self.registers.c,
+            ArithmeticTarget::Register(Register::D) => self.registers.d,
+            ArithmeticTarget::Register(Register::E) => self.registers.e,
+            ArithmeticTarget::Register(Register::H) => self.registers.h,
+            ArithmeticTarget::Register(Register::L) => self.registers.l,
+            ArithmeticTarget::IndirectHl => {
                 todo!("Need to figured out how I want to structure rom")
             }
         };
@@ -88,21 +95,22 @@ impl Cpu {
         self.registers.a = result;
         self.registers.f.set_zero(result == 0);
         self.registers.f.set_subtract(false);
-        // check to see if we carried at the nibble
-        self.registers.f.set_half_carry((result & 0x10) == 0x10);
+        self.registers
+            .f
+            .set_half_carry(check_for_half_carry(result));
         self.registers.f.set_carry(carry);
     }
 
     fn and(&mut self, target: ArithmeticTarget) {
         let value = match target {
-            ArithmeticTarget::A => self.registers.a,
-            ArithmeticTarget::B => self.registers.b,
-            ArithmeticTarget::C => self.registers.c,
-            ArithmeticTarget::D => self.registers.d,
-            ArithmeticTarget::E => self.registers.e,
-            ArithmeticTarget::H => self.registers.h,
-            ArithmeticTarget::L => self.registers.l,
-            ArithmeticTarget::IndirectHL => {
+            ArithmeticTarget::Register(Register::A) => self.registers.a,
+            ArithmeticTarget::Register(Register::B) => self.registers.b,
+            ArithmeticTarget::Register(Register::C) => self.registers.c,
+            ArithmeticTarget::Register(Register::D) => self.registers.d,
+            ArithmeticTarget::Register(Register::E) => self.registers.e,
+            ArithmeticTarget::Register(Register::H) => self.registers.h,
+            ArithmeticTarget::Register(Register::L) => self.registers.l,
+            ArithmeticTarget::IndirectHl => {
                 todo!("Need to figured out how I want to structure rom")
             }
         };
@@ -117,14 +125,14 @@ impl Cpu {
 
     fn xor(&mut self, target: ArithmeticTarget) {
         let value = match target {
-            ArithmeticTarget::A => self.registers.a,
-            ArithmeticTarget::B => self.registers.b,
-            ArithmeticTarget::C => self.registers.c,
-            ArithmeticTarget::D => self.registers.d,
-            ArithmeticTarget::E => self.registers.e,
-            ArithmeticTarget::H => self.registers.h,
-            ArithmeticTarget::L => self.registers.l,
-            ArithmeticTarget::IndirectHL => {
+            ArithmeticTarget::Register(Register::A) => self.registers.a,
+            ArithmeticTarget::Register(Register::B) => self.registers.b,
+            ArithmeticTarget::Register(Register::C) => self.registers.c,
+            ArithmeticTarget::Register(Register::D) => self.registers.d,
+            ArithmeticTarget::Register(Register::E) => self.registers.e,
+            ArithmeticTarget::Register(Register::H) => self.registers.h,
+            ArithmeticTarget::Register(Register::L) => self.registers.l,
+            ArithmeticTarget::IndirectHl => {
                 todo!("Need to figured out how I want to structure rom")
             }
         };
@@ -139,14 +147,14 @@ impl Cpu {
 
     fn or(&mut self, target: ArithmeticTarget) {
         let value = match target {
-            ArithmeticTarget::A => self.registers.a,
-            ArithmeticTarget::B => self.registers.b,
-            ArithmeticTarget::C => self.registers.c,
-            ArithmeticTarget::D => self.registers.d,
-            ArithmeticTarget::E => self.registers.e,
-            ArithmeticTarget::H => self.registers.h,
-            ArithmeticTarget::L => self.registers.l,
-            ArithmeticTarget::IndirectHL => {
+            ArithmeticTarget::Register(Register::A) => self.registers.a,
+            ArithmeticTarget::Register(Register::B) => self.registers.b,
+            ArithmeticTarget::Register(Register::C) => self.registers.c,
+            ArithmeticTarget::Register(Register::D) => self.registers.d,
+            ArithmeticTarget::Register(Register::E) => self.registers.e,
+            ArithmeticTarget::Register(Register::H) => self.registers.h,
+            ArithmeticTarget::Register(Register::L) => self.registers.l,
+            ArithmeticTarget::IndirectHl => {
                 todo!("Need to figured out how I want to structure rom")
             }
         };
@@ -159,16 +167,16 @@ impl Cpu {
         self.registers.f.set_carry(false);
     }
 
-    fn cp(&mut self, target: ArithmeticTarget) {
+    fn compare(&mut self, target: ArithmeticTarget) {
         let value = match target {
-            ArithmeticTarget::A => self.registers.a,
-            ArithmeticTarget::B => self.registers.b,
-            ArithmeticTarget::C => self.registers.c,
-            ArithmeticTarget::D => self.registers.d,
-            ArithmeticTarget::E => self.registers.e,
-            ArithmeticTarget::H => self.registers.h,
-            ArithmeticTarget::L => self.registers.l,
-            ArithmeticTarget::IndirectHL => {
+            ArithmeticTarget::Register(Register::A) => self.registers.a,
+            ArithmeticTarget::Register(Register::B) => self.registers.b,
+            ArithmeticTarget::Register(Register::C) => self.registers.c,
+            ArithmeticTarget::Register(Register::D) => self.registers.d,
+            ArithmeticTarget::Register(Register::E) => self.registers.e,
+            ArithmeticTarget::Register(Register::H) => self.registers.h,
+            ArithmeticTarget::Register(Register::L) => self.registers.l,
+            ArithmeticTarget::IndirectHl => {
                 todo!("Need to figured out how I want to structure rom")
             }
         };
@@ -178,13 +186,26 @@ impl Cpu {
         self.registers.f.set_zero(result == 0);
         self.registers.f.set_subtract(false);
         // check to see if we carried at the nibble
-        self.registers.f.set_half_carry((result & 0x10) == 0x10);
+        self.registers
+            .f
+            .set_half_carry(check_for_half_carry(result));
         self.registers.f.set_carry(carry);
     }
+
+    fn load(&mut self, dst: LoadTarget, src: LoadTarget) {
+        todo!()
+    }
+}
+
+/// Check to see if we carried at the nibble
+fn check_for_half_carry(value: u8) -> bool {
+    (value & 0x10) == 0x10
 }
 
 #[cfg(test)]
 mod tests {
+    use std::array::from_fn;
+
     use self::registers::Flags;
 
     use super::*;
@@ -204,72 +225,38 @@ mod tests {
             ..Default::default()
         };
 
-        let expected_states = [
+        let mut a = 0;
+        let expected_states: [Cpu; 7] = from_fn(|i| {
+            a += i as u8;
+            let mut f = Flags::default();
+            if a > 0b1111 {
+                f.set_half_carry(true);
+            } else if a == 0 {
+                f.set_zero(true);
+            }
             Cpu {
                 registers: Registers {
-                    f: Flags(0b1000_0000),
+                    a,
+                    f,
                     ..cpu.registers
                 },
                 ..cpu
-            },
-            Cpu {
-                registers: Registers {
-                    a: 1,
-                    ..cpu.registers
-                },
-                ..cpu
-            },
-            Cpu {
-                registers: Registers {
-                    a: 3,
-                    ..cpu.registers
-                },
-                ..cpu
-            },
-            Cpu {
-                registers: Registers {
-                    a: 6,
-                    ..cpu.registers
-                },
-                ..cpu
-            },
-            Cpu {
-                registers: Registers {
-                    a: 10,
-                    ..cpu.registers
-                },
-                ..cpu
-            },
-            Cpu {
-                registers: Registers {
-                    a: 15,
-                    ..cpu.registers
-                },
-                ..cpu
-            },
-            Cpu {
-                registers: Registers {
-                    a: 21,
-                    f: Flags(0b0010_0000),
-                    ..cpu.registers
-                },
-                ..cpu
-            },
-        ];
+            }
+        });
 
         let targets = [
-            ArithmeticTarget::A,
-            ArithmeticTarget::B,
-            ArithmeticTarget::C,
-            ArithmeticTarget::D,
-            ArithmeticTarget::E,
-            ArithmeticTarget::H,
-            ArithmeticTarget::L,
+            ArithmeticTarget::Register(Register::A),
+            ArithmeticTarget::Register(Register::B),
+            ArithmeticTarget::Register(Register::C),
+            ArithmeticTarget::Register(Register::D),
+            ArithmeticTarget::Register(Register::E),
+            ArithmeticTarget::Register(Register::H),
+            ArithmeticTarget::Register(Register::L),
         ];
 
         for (target, expected) in targets.into_iter().zip(expected_states.into_iter()) {
             cpu.execute(Instruction::Add(target));
-            assert_eq!(cpu, expected);
+            assert_eq!(cpu, expected, "Failed to add {:?}", target);
         }
     }
 
@@ -284,7 +271,7 @@ mod tests {
             ..Default::default()
         };
 
-        cpu.execute(Instruction::Add(ArithmeticTarget::B));
+        cpu.execute(Instruction::Add(ArithmeticTarget::Register(Register::B)));
         let expected = Cpu {
             registers: Registers {
                 a: 0,

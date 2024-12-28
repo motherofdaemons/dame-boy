@@ -13,35 +13,24 @@ pub struct Registers {
     pub l: u8,
 }
 
+macro_rules! wide_register {
+    ($hi:ident, $lo:ident, $getter:ident, $setter:ident) => {
+        pub fn $getter(&self) -> u16 {
+            let lo: u8 = transmute!(self.$lo);
+            ((self.$hi as u16) << 8) | lo as u16
+        }
+        pub fn $setter(&mut self, value: u16) {
+            self.$hi = ((value & 0xFF00) >> 8) as u8;
+            self.$lo = transmute!((value & 0x00FF) as u8);
+        }
+    };
+}
+
 impl Registers {
-    pub fn af(&self) -> u16 {
-        ((self.a as u16) << 8) | self.f.0 as u16
-    }
-    pub fn set_af(&mut self, value: u16) {
-        self.a = ((value & 0xFF00) >> 8) as u8;
-        self.f = transmute!((value & 0x00FF) as u8);
-    }
-    pub fn bc(&self) -> u16 {
-        ((self.b as u16) << 8) | self.c as u16
-    }
-    pub fn set_bc(&mut self, value: u16) {
-        self.b = ((value & 0xFF00) >> 8) as u8;
-        self.c = (value & 0x00FF) as u8;
-    }
-    pub fn de(&self) -> u16 {
-        ((self.d as u16) << 8) | self.e as u16
-    }
-    pub fn set_de(&mut self, value: u16) {
-        self.d = ((value & 0xFF00) >> 8) as u8;
-        self.e = (value & 0x00FF) as u8;
-    }
-    pub fn hl(&self) -> u16 {
-        ((self.h as u16) << 8) | self.l as u16
-    }
-    pub fn set_hl(&mut self, value: u16) {
-        self.h = ((value & 0xFF00) >> 8) as u8;
-        self.l = (value & 0x00FF) as u8;
-    }
+    wide_register!(a, f, af, set_af);
+    wide_register!(b, c, bc, set_bc);
+    wide_register!(d, e, de, set_de);
+    wide_register!(h, l, hl, set_hl);
 }
 
 bitfield! {
