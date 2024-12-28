@@ -11,7 +11,7 @@ pub enum Instruction {
     Load { dst: LoadTarget, src: LoadTarget },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Register {
     A,
     B,
@@ -22,7 +22,7 @@ pub enum Register {
     L,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WideRegister {
     BC,
     DE,
@@ -30,13 +30,13 @@ pub enum WideRegister {
     SP,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArithmeticTarget {
     Register(Register),
     IndirectHl,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoadTarget {
     Register(Register),
     WideRegister(WideRegister),

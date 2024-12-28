@@ -30,14 +30,14 @@ impl Emu {
     pub fn run(&mut self) -> ! {
         loop {
             let instruction = self.fetch_instruction();
-            self.cpu.execute(instruction);
+            self.cpu.execute(instruction, &mut self.mem);
         }
     }
 
     fn fetch_instruction(&self) -> Instruction {
         // TODO: handle extended opcode table
-        let addr = self.cpu.sp();
-        let opcode = self.mem.read(addr.into());
+        let addr = self.cpu.pc();
+        let opcode = self.mem.read(addr);
         opcode.into()
     }
 }

@@ -1,5 +1,7 @@
 use instructions::{LoadTarget, Register};
 
+use crate::mem::Mem;
+
 use self::{
     instructions::{ArithmeticTarget, Instruction},
     registers::Registers,
@@ -11,16 +13,17 @@ mod registers;
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Cpu {
     registers: Registers,
+    pc: u16,
     sp: u16,
 }
 
 impl Cpu {
-    pub fn sp(&self) -> u16 {
-        self.sp
+    pub fn pc(&self) -> u16 {
+        self.pc
     }
 
-    pub fn execute(&mut self, instruction: Instruction) {
-        match instruction {
+    pub fn execute(&mut self, instruction: Instruction, mem: &mut Mem) {
+        let (bytes, _cycles) = match instruction {
             Instruction::Nop => self.nop(),
             Instruction::Add(target) => self.add(target, false),
             Instruction::AddCarry(target) => self.add(target, true),
@@ -30,16 +33,19 @@ impl Cpu {
             Instruction::Xor(target) => self.xor(target),
             Instruction::Or(target) => self.or(target),
             Instruction::Compare(target) => self.compare(target),
-            Instruction::Load { dst, src } => self.load(dst, src),
-        }
+            Instruction::Load { dst, src } => self.load(dst, src, mem),
+        };
+        self.pc += bytes as u16;
     }
 
-    fn nop(&self) {}
+    fn nop(&self) -> (u8, u8) {
+        (1, 1)
+    }
 
     /// Take the value from `target` register and add it to A.
     ///
     /// - `carry` will use the carrybit in the addition.
-    fn add(&mut self, target: ArithmeticTarget, carry: bool) {
+    fn add(&mut self, target: ArithmeticTarget, carry: bool) -> (u8, u8) {
         let value = match target {
             ArithmeticTarget::Register(Register::A) => self.registers.a,
             ArithmeticTarget::Register(Register::B) => self.registers.b,
@@ -66,12 +72,21 @@ impl Cpu {
         // check to see if we carried at the nibble
         self.registers.f.set_half_carry((result & 0x10) == 0x10);
         self.registers.f.set_carry(carry);
+
+        (
+            1,
+            if target == ArithmeticTarget::IndirectHl {
+                2
+            } else {
+                1
+            },
+        )
     }
 
     /// Take the value from `target` register and sub it to from A.
     ///
     /// - `carry` will use the carrybit in the subtraction.
-    fn sub(&mut self, target: ArithmeticTarget, carry: bool) {
+    fn sub(&mut self, target: ArithmeticTarget, carry: bool) -> (u8, u8) {
         let value = match target {
             ArithmeticTarget::Register(Register::A) => self.registers.a,
             ArithmeticTarget::Register(Register::B) => self.registers.b,
@@ -99,9 +114,17 @@ impl Cpu {
             .f
             .set_half_carry(check_for_half_carry(result));
         self.registers.f.set_carry(carry);
+        (
+            1,
+            if target == ArithmeticTarget::IndirectHl {
+                2
+            } else {
+                1
+            },
+        )
     }
 
-    fn and(&mut self, target: ArithmeticTarget) {
+    fn and(&mut self, target: ArithmeticTarget) -> (u8, u8) {
         let value = match target {
             ArithmeticTarget::Register(Register::A) => self.registers.a,
             ArithmeticTarget::Register(Register::B) => self.registers.b,
@@ -121,9 +144,17 @@ impl Cpu {
         self.registers.f.set_subtract(false);
         self.registers.f.set_half_carry(true);
         self.registers.f.set_carry(false);
+        (
+            1,
+            if target == ArithmeticTarget::IndirectHl {
+                2
+            } else {
+                1
+            },
+        )
     }
 
-    fn xor(&mut self, target: ArithmeticTarget) {
+    fn xor(&mut self, target: ArithmeticTarget) -> (u8, u8) {
         let value = match target {
             ArithmeticTarget::Register(Register::A) => self.registers.a,
             ArithmeticTarget::Register(Register::B) => self.registers.b,
@@ -143,9 +174,17 @@ impl Cpu {
         self.registers.f.set_subtract(false);
         self.registers.f.set_half_carry(false);
         self.registers.f.set_carry(false);
+        (
+            1,
+            if target == ArithmeticTarget::IndirectHl {
+                2
+            } else {
+                1
+            },
+        )
     }
 
-    fn or(&mut self, target: ArithmeticTarget) {
+    fn or(&mut self, target: ArithmeticTarget) -> (u8, u8) {
         let value = match target {
             ArithmeticTarget::Register(Register::A) => self.registers.a,
             ArithmeticTarget::Register(Register::B) => self.registers.b,
@@ -165,9 +204,17 @@ impl Cpu {
         self.registers.f.set_subtract(false);
         self.registers.f.set_half_carry(false);
         self.registers.f.set_carry(false);
+        (
+            1,
+            if target == ArithmeticTarget::IndirectHl {
+                2
+            } else {
+                1
+            },
+        )
     }
 
-    fn compare(&mut self, target: ArithmeticTarget) {
+    fn compare(&mut self, target: ArithmeticTarget) -> (u8, u8) {
         let value = match target {
             ArithmeticTarget::Register(Register::A) => self.registers.a,
             ArithmeticTarget::Register(Register::B) => self.registers.b,
@@ -190,10 +237,66 @@ impl Cpu {
             .f
             .set_half_carry(check_for_half_carry(result));
         self.registers.f.set_carry(carry);
+        (
+            1,
+            if target == ArithmeticTarget::IndirectHl {
+                2
+            } else {
+                1
+            },
+        )
     }
 
-    fn load(&mut self, dst: LoadTarget, src: LoadTarget) {
-        todo!()
+    fn load(&mut self, dst: LoadTarget, src: LoadTarget, mem: &mut Mem) -> (u8, u8) {
+        match dst {
+            LoadTarget::Register(register) => {
+                let value = match src {
+                    LoadTarget::Register(register) => match register {
+                        Register::A => self.registers.a,
+                        Register::B => self.registers.b,
+                        Register::C => self.registers.c,
+                        Register::D => self.registers.d,
+                        Register::E => self.registers.e,
+                        Register::H => self.registers.h,
+                        Register::L => self.registers.l,
+                    },
+                    LoadTarget::Immediate8 => todo!(),
+                    LoadTarget::IndirectWideRegister(wide_register) => todo!(),
+                    LoadTarget::IndirectHlInc => todo!(),
+                    src => unreachable!("None of these should be a src for a register {:?}", src),
+                };
+                let dst = match register {
+                    Register::A => &mut self.registers.a,
+                    Register::B => &mut self.registers.b,
+                    Register::C => &mut self.registers.c,
+                    Register::D => &mut self.registers.d,
+                    Register::E => &mut self.registers.e,
+                    Register::H => &mut self.registers.h,
+                    Register::L => &mut self.registers.l,
+                };
+                *dst = value;
+                // TODO: This is wrong :^(
+                (1, 1)
+            }
+            LoadTarget::WideRegister(wide_register) => match wide_register {
+                instructions::WideRegister::BC => todo!(),
+                instructions::WideRegister::DE => todo!(),
+                instructions::WideRegister::HL => todo!(),
+                instructions::WideRegister::SP => todo!(),
+            },
+            LoadTarget::IndirectHlInc => todo!(),
+            LoadTarget::IndirectHlDec => {
+                if src != LoadTarget::Register(Register::A) {
+                    unreachable!("We should only storing the value of A")
+                }
+                let value = self.registers.a;
+                let addr = self.registers.hl();
+                self.registers.set_hl(addr - 1);
+                mem.write(addr, value);
+                (1, 2)
+            }
+            dst => unreachable!("None of these should be destinations {:?}", dst),
+        }
     }
 }
 

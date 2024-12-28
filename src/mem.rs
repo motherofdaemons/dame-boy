@@ -21,9 +21,14 @@ impl Mem {
         }
     }
 
-    pub fn read(&self, addr: usize) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         // TODO: check for where to read from either boot rom or cart.
-        self.rom.boot[addr]
+        self.rom.boot[addr as usize]
+    }
+
+    pub fn write(&mut self, addr: u16, value: u8) {
+        // TODO: check for where to read from either boot rom or cart.
+        self.rom.boot[addr as usize] = value;
     }
 }
 
